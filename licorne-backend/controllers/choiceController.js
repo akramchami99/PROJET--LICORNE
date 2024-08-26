@@ -21,6 +21,42 @@ const getChoices = async (req, res) => {
   }
 };
 
+// Get Choices for a Specific Scenario
+const getChoicesForScenario = async (req, res) => {
+  const { id } = req.params; // The scenario ID
+
+  try {
+    // Find the scenario by ID and include the related choices
+    const scenario = await Scenario.findOne({
+      where: { id },
+      include: [
+        {
+          model: Choice,
+          where: { ScenarioId: id },
+          required: false, // Set this to false in case no choices exist
+        },
+      ],
+    });
+
+    if (!scenario) {
+      return res.status(404).json({ message: 'Scenario not found' });
+    }
+
+    // Send back the scenario with associated choices
+    res.json({
+      scenarioId: scenario.id,
+      description: scenario.description,
+      level: scenario.level,
+      choices: scenario.Choices, // Assuming Choices is the name of the association
+    });
+  } catch (error) {
+    console.error('Error fetching scenario choices:', error);
+    res.status(500).json({ message: 'Error fetching scenario choices', error });
+  }
+};
+
+
+
 // Submit a Choice and Process the Outcome
 const submitChoice = async (req, res) => {
   const { userId, unicornId, choiceId, scenarioId } = req.body; // Extract unicornId, choiceId, scenarioId from the request body
@@ -88,4 +124,4 @@ const submitChoice = async (req, res) => {
   }
 };
 
-module.exports = { getChoices, submitChoice };
+module.exports = { getChoices, submitChoice, getChoicesForScenario };

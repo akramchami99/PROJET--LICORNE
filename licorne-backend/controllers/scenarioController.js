@@ -17,69 +17,112 @@ const getScenario = async (req, res) => {
   }
 };
 
-// Create Scenario
-const createScenario= async (req, res) => {
+const createScenario = async (req, res) => {
   const { description, level, steps } = req.body;
+
   try {
+    // First, create the scenario
     const newScenario = await Scenario.create({ description, level });
     
+    // Prepare an array to hold the created choices
+    const createdChoices = [];
+
     // Loop through steps and create choices
-    for (const step of steps) {
+    for (const stepIndex in steps) {
+      const step = steps[stepIndex];
+      const stepId = parseInt(stepIndex) + 1; // Steps go from 1 to 3 (increment by 1)
+
+      console.log(`Processing step: ${stepId}`);  // Log the step being processed
+      
       for (const choice of step.choices) {
-        await Choice.create({
+        console.log(`Creating choice for step ${stepId}: ${choice.text}`);
+        
+        const createdChoice = await Choice.create({
           text: choice.text,
           required_attribute: choice.requiredAttribute,
           required_points: choice.requiredPoints,
           outcome_success: choice.outcomeSuccess,
           outcome_failure: choice.outcomeFailure,
-          step: step.id,
-          ScenarioId: newScenario.id,
+          step: stepId, // Assign the step number (from 1 to 3)
+          ScenarioId: newScenario.id, // Link the choice to the scenario
         });
+
+        // Add created choice to the array for response
+        createdChoices.push(createdChoice);
       }
     }
-    
-    res.json({ message: 'Scenario created successfully!' });
+
+    // Send back the new scenario and its created choices
+    res.json({
+      message: 'Scenario created successfully!',
+      scenario: newScenario,
+      choices: createdChoices, // Include the choices in the response
+    });
   } catch (error) {
+    console.error('Error creating scenario:', error);
     res.status(500).json({ message: 'Error creating scenario', error });
   }
 };
 
 
+
 // Update Scenario
 const updateScenario = async (req, res) => {
-  const { id } = req.params;
-  const { description, level, steps } = req.body;
+  const { id } = req.params; // The scenario ID
+  const { description, level, steps } = req.body; // The updated data from the frontend
 
   try {
-    // Update scenario details
-    const scenario = await Scenario.findByPk(id);
-    if (!scenario) return res.status(404).json({ message: 'Scenario not found' });
+    // Find the scenario to ensure it exists
+    const scenario = await Scenario.findOne({ where: { id } });
 
-    await scenario.update({ description, level });
+    if (!scenario) {
+      return res.status(404).json({ message: 'Scenario not found' });
+    }
 
-    // Delete old choices
-    await Choice.destroy({ where: { ScenarioId: id } });
+    // Update the scenario's description and level
+    scenario.description = description;
+    scenario.level = level;
+    await scenario.save();
 
-    // Add new choices
-    for (const step of steps) {
+    // Loop through each step and update or create choices
+    for (const stepIndex in steps) {
+      const step = steps[stepIndex];
+      const stepId = parseInt(stepIndex) + 1; // Steps go from 1 to 3
+
       for (const choice of step.choices) {
-        await Choice.create({
-          text: choice.text,
-          required_attribute: choice.requiredAttribute,
-          required_points: choice.requiredPoints,
-          outcome_success: choice.outcomeSuccess,
-          outcome_failure: choice.outcomeFailure,
-          step: step.id,
-          ScenarioId: id,
-        });
+        if (choice.id) {
+          // If the choice already has an ID, update the existing choice
+          const existingChoice = await Choice.findOne({ where: { id: choice.id, ScenarioId: id } });
+          if (existingChoice) {
+            existingChoice.text = choice.text;
+            existingChoice.required_attribute = choice.requiredAttribute;
+            existingChoice.required_points = choice.requiredPoints;
+            existingChoice.outcome_success = choice.outcomeSuccess;
+            existingChoice.outcome_failure = choice.outcomeFailure;
+            existingChoice.step = stepId;
+            await existingChoice.save(); // Save the updated choice
+          }
+        } else {
+          // If no choice ID, create a new choice for this step
+          await Choice.create({
+            text: choice.text,
+            required_attribute: choice.requiredAttribute,
+            required_points: choice.requiredPoints,
+            outcome_success: choice.outcomeSuccess,
+            outcome_failure: choice.outcomeFailure,
+            step: stepId,
+            ScenarioId: id,
+          });
+        }
       }
     }
 
-    res.json({ message: 'Scenario updated successfully!' });
+    res.json({ message: 'Scenario and choices updated successfully!' });
   } catch (error) {
-    res.status(500).json({ message: 'Error updating scenario', error });
+    res.status(500).json({ message: 'Error updating scenario and choices', error });
   }
 };
+
 
 // Delete Scenario
 const deleteScenario = async (req, res) => {

@@ -14,27 +14,30 @@ export default function AdminPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchScenarios();  // Fetch scenarios on component mount
+    fetchScenarios(); // Fetch scenarios on component mount
   }, []);
 
+  // Fetch all scenarios from backend
   const fetchScenarios = async () => {
     try {
       const response = await axios.get('http://localhost:3000/api/get-scenario');
       setScenarios(response.data.scenario);
-      console.log(response.data.scenario)
     } catch (error) {
       setError('Error fetching scenarios');
     }
   };
 
+  // Handle scenario description input change
   const handleScenarioChange = (e) => {
     setScenarioDescription(e.target.value);
   };
 
+  // Handle scenario level input change
   const handleScenarioLevelChange = (e) => {
     setScenarioLevel(e.target.value);
   };
 
+  // Handle changes to choices inputs
   const handleChoiceChange = (stepId, choiceId, field, value) => {
     setSteps((prevSteps) => {
       return prevSteps.map((step) => {
@@ -50,6 +53,25 @@ export default function AdminPage() {
         return step;
       });
     });
+  };
+
+  // Form validation function
+  const validateForm = () => {
+    if (!scenarioDescription || !scenarioLevel) {
+      return 'Scenario description and level are required';
+    }
+
+    for (const step of steps) {
+      if (step.choices.length !== 3) {
+        return `Each step must have exactly 3 choices. Step ${step.id} is invalid.`;
+      }
+      for (const choice of step.choices) {
+        if (!choice.text || !choice.requiredAttribute || choice.requiredPoints <= 0 || !choice.outcomeSuccess || !choice.outcomeFailure) {
+          return `All choices in step ${step.id} must have valid text, required attribute, required points, success outcome, and failure outcome.`;
+        }
+      }
+    }
+    return ''; // If no validation errors
   };
 
   // Handle form submission for create/update
@@ -89,6 +111,7 @@ export default function AdminPage() {
     }
   };
 
+  // Reset form state after submission
   const resetForm = () => {
     setScenarioDescription('');
     setScenarioLevel('');
@@ -100,17 +123,62 @@ export default function AdminPage() {
     setSelectedScenarioId(null); // Reset selected scenario
   };
 
-  // Edit scenario (fill the form with existing data)
-  const handleEdit = (scenario) => {
-    setScenarioDescription(scenario.description);
-    setScenarioLevel(scenario.level);
-    setSteps([
-      { id: 1, choices: scenario.Choices.filter(choice => choice.step === 1) },
-      { id: 2, choices: scenario.Choices.filter(choice => choice.step === 2) },
-      { id: 3, choices: scenario.Choices.filter(choice => choice.step === 3) },
-    ]);
-    setSelectedScenarioId(scenario.id); // Set scenario id for update
+  const handleEdit = async (scenario) => {
+    try {
+      // Fetch scenario along with its choices
+      const response = await axios.get(`http://localhost:3000/api/getScenario-choices/${scenario.id}`);
+      const fetchedScenario = response.data;
+  
+      // Set scenario description and level
+      setScenarioDescription(fetchedScenario.description);
+      setScenarioLevel(fetchedScenario.level);
+  
+      // Group the choices into steps
+      const step1Choices = fetchedScenario.choices.slice(0, 3); // First 3 choices for step 1
+      const step2Choices = fetchedScenario.choices.slice(3, 6); // Next 3 choices for step 2
+      const step3Choices = fetchedScenario.choices.slice(6, 9); // Last 3 choices for step 3
+  
+      // Set the steps with the choices
+      const updatedSteps = [
+        {
+          id: 1,
+          choices: step1Choices.map(choice => ({
+            text: choice.text || '',
+            requiredAttribute: choice.required_attribute || '',
+            requiredPoints: choice.required_points || 0,
+            outcomeSuccess: choice.outcome_success || '',
+            outcomeFailure: choice.outcome_failure || ''
+          })),
+        },
+        {
+          id: 2,
+          choices: step2Choices.map(choice => ({
+            text: choice.text || '',
+            requiredAttribute: choice.required_attribute || '',
+            requiredPoints: choice.required_points || 0,
+            outcomeSuccess: choice.outcome_success || '',
+            outcomeFailure: choice.outcome_failure || ''
+          })),
+        },
+        {
+          id: 3,
+          choices: step3Choices.map(choice => ({
+            text: choice.text || '',
+            requiredAttribute: choice.required_attribute || '',
+            requiredPoints: choice.required_points || 0,
+            outcomeSuccess: choice.outcome_success || '',
+            outcomeFailure: choice.outcome_failure || ''
+          })),
+        },
+      ];
+  
+      setSteps(updatedSteps); // Set steps with the updated choices
+      setSelectedScenarioId(fetchedScenario.scenarioId); // Set scenario id for update
+    } catch (error) {
+      setError('Error loading scenario for editing');
+    }
   };
+
 
   // Delete scenario
   const handleDelete = async (id) => {
@@ -136,25 +204,25 @@ export default function AdminPage() {
           <input type="number" placeholder="Scenario Level" value={scenarioLevel} onChange={handleScenarioLevelChange} required />
         </div>
         <div className=''>
-        {steps.map((step, stepIndex) => (
-          <div key={step.id} className='scenario--form'>
-            <h3>Step {step.id}</h3>
-            {step.choices.map((choice, choiceIndex) => (
-              <div key={choiceIndex}>
-                <input type="text" placeholder="Choice Text" value={choice.text} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'text', e.target.value)} required />
-                <select value={choice.requiredAttribute} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'requiredAttribute', e.target.value)} required>
-                  <option value="">Select Attribute</option>
-                  <option value="force">Force</option>
-                  <option value="intelligence">Intelligence</option>
-                  <option value="esquive">Esquive</option>
-                </select>
-                <input type="number" placeholder="Required Points" value={choice.requiredPoints} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'requiredPoints', e.target.value)} required />
-                <input type="text" placeholder="Success Outcome" value={choice.outcomeSuccess} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'outcomeSuccess', e.target.value)} required />
-                <input type="text" placeholder="Failure Outcome" value={choice.outcomeFailure} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'outcomeFailure', e.target.value)} required />
-              </div>
-            ))}
-          </div>
-        ))}
+          {steps.map((step, stepIndex) => (
+            <div key={step.id} className='scenario--form'>
+              <h3>Step {step.id}</h3>
+              {step.choices.map((choice, choiceIndex) => (
+                <div key={choiceIndex}>
+                  <input type="text" placeholder="Choice Text" value={choice.text} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'text', e.target.value)} required />
+                  <select value={choice.requiredAttribute} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'requiredAttribute', e.target.value)} required>
+                    <option value="">Select Attribute</option>
+                    <option value="force">Force</option>
+                    <option value="intelligence">Intelligence</option>
+                    <option value="esquive">Esquive</option>
+                  </select>
+                  <input type="number" placeholder="Required Points" value={choice.requiredPoints} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'requiredPoints', e.target.value)} required />
+                  <input type="text" placeholder="Success Outcome" value={choice.outcomeSuccess} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'outcomeSuccess', e.target.value)} required />
+                  <input type="text" placeholder="Failure Outcome" value={choice.outcomeFailure} onChange={(e) => handleChoiceChange(step.id, choiceIndex, 'outcomeFailure', e.target.value)} required />
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
 
         <button type="submit">{selectedScenarioId ? 'Update Scenario' : 'Create Scenario'}</button>

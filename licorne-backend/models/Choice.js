@@ -29,7 +29,7 @@ const Choice = sequelize.define('Choice', {
   }
 });
 
-Scenario.hasMany(Choice);
+Scenario.hasMany(Choice, { onDelete: 'CASCADE' });
 Choice.belongsTo(Scenario);
 
 module.exports = Choice;
