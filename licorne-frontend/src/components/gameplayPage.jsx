@@ -291,7 +291,7 @@ export default function GameplayPage() {
     else if (action === 'clear') {
       clearConsole();
     } else {
-      appendToConsole('Invalid command. Try: create <name> <force> <intelligence> <esquive>, play <unicornId>, select <scenarioId>, or choose <choiceId>.');
+      appendToConsole('Invalid command. Try: create <name> <force> <intelligence> <esquive>, play <unicornId>, select <scenarioId>, choose <choiceId>, assign <attribute>, admin ');
     }
 
     setCommand(''); // Clear the command input
